@@ -1,0 +1,13 @@
+{
+  "name": "sakib-seo-tools",
+  "owner": { "name": "Md Sakib Hossain" },
+  "metadata": { "description": "SEO, performance and indexing agent for Claude Code" },
+  "plugins": [
+    {
+      "name": "seo-agent",
+      "source": "./plugins/seo-agent",
+      "description": "Audits SEO, performance and indexing (Lighthouse/PageSpeed, crawler, Google Search Console, Bing, IndexNow), fixes code only with approval, protects secret files, and runs weekly in the cloud.",
+      "version": "1.0.0"
+    }
+  ]
+}

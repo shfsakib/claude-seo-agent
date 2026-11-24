@@ -1,0 +1,7 @@
+{
+  "name": "seo-agent",
+  "version": "1.0.0",
+  "description": "SEO + performance + indexing agent with a setup wizard, secret-file guard and weekly cloud monitoring.",
+  "author": { "name": "Md Sakib Hossain" },
+  "keywords": ["seo", "lighthouse", "search-console", "bing", "indexnow", "nextjs"]
+}
