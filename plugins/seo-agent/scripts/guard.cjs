@@ -121,7 +121,40 @@ function main(input) {
       return false;
     });
   }
-  const isBlocked = (abs) => test(abs, BLOCKED) && !test(abs, EXCEPT);
+  const isBlockedFile = (abs) => test(abs, BLOCKED) && !test(abs, EXCEPT);
+  // a directory is protected if a "dir/**" pattern covers its contents
+  const isBlocked = (abs) => isBlockedFile(abs) || test(path.join(abs, "__seo_probe__"), BLOCKED);
+
+  // walk a directory and return the first protected file inside it (or null)
+  function protectedInside(scope, globFilter) {
+    let seen = 0; let hit = null;
+    const consider = (abs) => {
+      if (!isBlockedFile(abs)) return;
+      if (globFilter) {
+        const rel = path.relative(scope, abs).split(path.sep).join("/");
+        const base = path.posix.basename(rel);
+        if (!globFilter.some(({ re, hasSlash }) => re.test(hasSlash ? rel : base))) return;
+      }
+      hit = relOf(abs);
+    };
+    const walk = (dir, depth) => {
+      if (hit || depth > 12) return;
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (++seen > 40000) { hit = "(scope too large to verify)"; return; }
+        const abs = path.join(dir, e.name);
+        if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) walk(abs, depth + 1); }
+        else consider(abs);
+        if (hit) return;
+      }
+    };
+    let st = null;
+    try { st = fs.statSync(scope); } catch { return null; }
+    if (st.isDirectory()) { if (isBlocked(scope)) return relOf(scope); walk(scope, 0); }
+    else consider(scope);
+    return hit;
+  }
   const isSelf = (abs) => test(abs, SELF) || isInside(abs, PLUGIN_ROOT) || isInside(abs, HOME_CLAUDE);
   const isFree = (abs) => !relOf(abs).startsWith("..") && test(abs, FREE);
 
@@ -137,13 +170,35 @@ function main(input) {
     if (/(^|[\s"'=/])\.env(\.[\w.-]+)?(?=$|[\s"';|&)>])/i.test(cmd) && !/\.env\.(example|sample|template|seo\.example)\b/i.test(cmd))
       block("this command references a .env file.");
 
-    const tokens = cmd.split(/[\s;|&<>()`=,]+/).map((t) => normalizeInput(t)).filter((t) => t && /[./]/.test(t));
-    const writey = /(^|[\s;|&])(rm|mv|cp|tee|chmod|chown|ln|truncate|dd|unlink|perl|python3?|ruby|install)\b|sed\s+-i|>{1,2}|node\s+(-e|--eval|-p)\b|git\s+(checkout|restore|rm|reset|clean)\b/;
+    const rawTokens = cmd.split(/[\s;|&<>()`=,]+/).map((t) => normalizeInput(t)).filter((t) => t && !t.startsWith("-"));
+    const candidates = [];
+    for (const t of rawTokens) {
+      for (const v of new Set([t, t.replace(/^[^:/\s]+:(?!\/)/, "")])) {   // also "HEAD:src/x.js" -> "src/x.js"
+        if (!v) continue;
+        const abs = absOf(v);
+        let st = null;
+        try { st = fs.statSync(abs); } catch {}
+        if (/[./*]/.test(v) || st) candidates.push({ t: v, abs, isDir: !!(st && st.isDirectory()), exists: !!st });
+      }
+    }
     const cmdForWrite = cmd.replace(/\d*>&\d+/g, " ").replace(/\d*>{1,2}\s*\/dev\/null/g, " ");
-    for (const t of tokens) {
-      const abs = absOf(t);
-      if (isBlocked(abs)) block(`this command touches a protected path: ${t}`);
-      if (isSelf(abs) && writey.test(cmdForWrite)) block(`the agent cannot change its own safety config or the plugin: ${t}`);
+    const writey = /(^|[\s;|&])(rm|mv|cp|tee|chmod|chown|ln|truncate|dd|unlink|perl|python3?|ruby|install)\b|sed\s+-i|>{1,2}|node\s+(-e|--eval|-p)\b|git\s+(checkout|restore|rm|reset|clean)\b/;
+    for (const c of candidates) {
+      if (isBlocked(c.abs)) block(`this command touches a protected path: ${c.t}`);
+      if (isSelf(c.abs) && writey.test(cmdForWrite)) block(`the agent cannot change its own safety config or the plugin: ${c.t}`);
+    }
+
+    // Commands that READ file contents recursively / in bulk: make sure no protected file is in their scope.
+    const reader = /(^|[\s;|&(`])(grep|egrep|fgrep|rg|ag|ack|cat|head|tail|less|more|awk|sed|strings|xargs|tar|zip|rsync|cp|od|xxd|hexdump|base64|sort|uniq|wc|diff|nl|tac|bat|cpio|git\s+(grep|show|diff|log|archive|blame|cat-file|stash))\b/.test(cmd)
+      || (/(^|[\s;|&(])find\b/.test(cmd) && /-exec|-execdir|xargs|-fprint/.test(cmd));
+    if (reader) {
+      const scopes = candidates.filter((c) => c.isDir).map((c) => c.abs);
+      const implicitCwd = /(^|[\s;|&(])(rg|ag|ack)\b|git\s+(grep|diff|log|show|archive|stash)\b|(^|[\s;|&(])e?grep\s+[^|;&]*-[a-zA-Z]*[rR]/.test(cmd);
+      if (implicitCwd && !candidates.some((c) => c.exists)) scopes.push(projectDir);
+      for (const sc of scopes) {
+        const hit = protectedInside(sc);
+        if (hit) block(`this command would read inside a folder that contains protected files (${hit}). Point it at specific files or a folder without protected files${/git\s+(diff|log|show)/.test(cmd) ? ", e.g. git diff -- src/app" : ""}.`);
+      }
     }
     out({});
   }
@@ -160,37 +215,8 @@ function main(input) {
 
   // Grep reads file CONTENTS: make sure no protected file is inside the search scope.
   if (tool === "Grep") {
-    const scope = absOf(ti.path || ".");
-    const globFilter = ti.glob ? compile([String(ti.glob)]) : null;
-    const hits = [];
-    let seen = 0;
-    const consider = (abs) => {
-      if (!isBlocked(abs)) return;
-      if (globFilter) {
-        const rel = path.relative(scope, abs).split(path.sep).join("/");
-        const base = path.posix.basename(rel);
-        if (!globFilter.some(({ re, hasSlash }) => re.test(hasSlash ? rel : base))) return;
-      }
-      hits.push(relOf(abs));
-    };
-    const walk = (dir, depth) => {
-      if (hits.length || depth > 12) return;
-      let entries;
-      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-      for (const e of entries) {
-        if (++seen > 40000) block("search scope is too large to verify safely. Narrow the Grep path to a smaller folder.");
-        const abs = path.join(dir, e.name);
-        if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) walk(abs, depth + 1); }
-        else consider(abs);
-        if (hits.length) return;
-      }
-    };
-    let st = null;
-    try { st = fs.statSync(scope); } catch {}
-    if (st && st.isDirectory()) walk(scope, 0);
-    else if (st) consider(scope);
-    if (hits.length)
-      block(`this search would read protected file contents (${hits[0]}${hits.length > 1 ? " and others" : ""}). Narrow the Grep path to a folder without protected files, or add a glob that excludes them.`);
+    const hit = protectedInside(absOf(ti.path || "."), ti.glob ? compile([String(ti.glob)]) : null);
+    if (hit) block(`this search would read protected file contents (${hit}). Narrow the Grep path to a folder without protected files, or add a glob that excludes them.`);
   }
 
   // ------------------------------------------------------------ writes
