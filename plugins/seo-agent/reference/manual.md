@@ -42,6 +42,7 @@ and report. Never commit or push unless asked. Never touch checkout/cart/payment
 | `node <tools>/gsc.mjs sitemaps` / `submit-sitemap` | sitemap status / resubmit |
 | `node <tools>/bing.mjs quota` / `queries` / `submit` | Bing API check, query data, URL submission |
 | `node <tools>/bing.mjs indexnow [url...]` | instant ping (Bing, Yandex, Naver, Seznam…) for new/changed URLs |
+| `node <tools>/schedule.mjs status` / `due [--force x]` / `mark <job>` | monitoring schedule: which jobs are due, record finished jobs |
 Raw JSON goes to `seo-reports/raw/`. Exit code 3 = a key is missing: say which, point to the setup doc, continue with the rest.
 
 ## 3. What to check in code
@@ -58,7 +59,8 @@ Framework specifics: see `nextjs.md` in the reference folder when the project us
 
 ## 4. Workflow
 Audit (`/seo-agent:audit`) → Fix with approval (`/seo-agent:fix`) → Index after deploy (`/seo-agent:index`)
-→ Grow from search data (`/seo-agent:grow`) → Weekly monitoring (`/seo-agent:weekly`, usually a cloud scheduled task).
+→ Grow from search data (`/seo-agent:grow`) → Scheduled monitoring: night `/seo-agent:run` (only due jobs) + morning
+`/seo-agent:deliver` (opens the PR), both cloud tasks; intervals via `/seo-agent:schedule`. Dates use config `timezone`.
 
 ## 5. Honesty
 - Never promise rankings. Technical SEO is necessary; content quality, relevance, links/authority and competition decide

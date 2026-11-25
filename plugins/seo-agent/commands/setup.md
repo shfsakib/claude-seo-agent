@@ -41,8 +41,9 @@ A6. `.claude/settings.json` (project): build the recommended content = deny rule
 B1. Ask for the live domain. Fetch the homepage, `/robots.txt`, the sitemap (from robots or `/sitemap.xml`). Detect www vs
     non-www (follow redirects) and a `google-site-verification` meta tag (hint: URL-prefix property).
 B2. Create `.seo-agent/config.json` (approval):
-    `{ "siteUrl", "sitemapUrl", "gscProperty", "framework", "replyLanguage", "maxPages": 50, "speedPages": 5,
-       "maxLinkChecks": 150, "strikingMinImpressions": 20 }`
+    `{ "siteUrl", "sitemapUrl", "gscProperty", "framework", "replyLanguage", "timezone": "<user's IANA zone, e.g. Asia/Dhaka>",
+       "maxPages": <≥ sitemap URL count>, "speedPages": 5, "maxLinkChecks": 150, "strikingMinImpressions": 20,
+       "schedule": { "index": 3, "audit": 7, "speed": 15, "growth": 30 } }`  (ask the user if they want other intervals)
 B3. Create `.seo-agent/project-notes.md` (approval) with what you learned: framework, key folders, data flow for pages,
     validation commands, things never to touch (checkout, payments…), deploy method if the user knows it.
 B4. Run `onpage.mjs --sitemap 10` as a smoke test and show a 3-line result.
@@ -56,8 +57,10 @@ C3. Remind: `.env.seo` lives in the project root and only the user edits it. Nev
 ## Phase D — First audit
 Run `/seo-agent:audit` (or tell the user to run it) and summarize the top 5 agent fixes and top 5 user tasks.
 
-## Phase E — Weekly cloud monitoring
-Follow `cloud-schedule.md` sections A→D with the user. Give them the exact environment variable names, the base64 command,
-the network allow list and the prompt `/seo-agent:weekly`. Finish with "Run now" test and confirm the report appeared.
+## Phase E — Scheduled cloud monitoring
+If `config.json` has no `schedule`/`timezone`, propose adding them first (change protocol). Ask the user for two clock times:
+check time (default 03:00) and report time (default 08:00), at least 2 hours apart. Then follow `cloud-schedule.md` A→D:
+pre-flight, environment variables + base64 command, Vercel ignored build step if they use Vercel, create the two tasks
+("SEO night check" → `/seo-agent:run`, "SEO morning report" → `/seo-agent:deliver`), Run-now test of both.
 
-At the end, print a final checklist (all ✅ / what's left) and how to use: audit, fix, index, grow, weekly.
+At the end, print a final checklist (all ✅ / what's left) and how to use: audit, fix, index, grow, schedule, run, deliver.

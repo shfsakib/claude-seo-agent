@@ -11,7 +11,7 @@ try {
     "[seo-agent plugin is active]",
     `Manual (read before any SEO work): ${path.join(root, "reference", "manual.md")}`,
     `Reference docs folder: ${path.join(root, "reference")}`,
-    `Run tools from the project root with: node "${tools}/<tool>.mjs" <args>   (tools: onpage, speed, gsc, bing)`,
+    `Run tools from the project root with: node "${tools}/<tool>.mjs" <args>   (tools: onpage, speed, gsc, bing, schedule)`,
     "Security: protected files are enforced by a hook. Never try to bypass a BLOCKED message.",
     configured
       ? "This project is configured (.seo-agent/config.json). Project notes: .seo-agent/project-notes.md"

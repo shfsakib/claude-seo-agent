@@ -30,6 +30,11 @@ if (!PROJECT) {
 }
 export const config = JSON.parse(fs.readFileSync(path.join(PROJECT, ".seo-agent", "config.json"), "utf8"));
 export const SITE = String(config.siteUrl || "").replace(/\/$/, "");
+export const TZ = config.timezone || "Asia/Dhaka";
+// today's date (YYYY-MM-DD) in the project's timezone, not UTC
+export function today(d = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
 
 // ---- secrets: process env (cloud) or <project>/.env.seo (local). Values are never printed.
 const envFile = path.join(PROJECT, ".env.seo");
@@ -112,7 +117,7 @@ export function meta(html, key) {
 export function saveReport(name, data) {
   const dir = path.join(PROJECT, "seo-reports", "raw");
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `${new Date().toISOString().slice(0, 10)}-${name}.json`);
+  const file = path.join(dir, `${today()}-${name}.json`);
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
   console.log(`\nSaved: ${path.relative(PROJECT, file)}`);
   return file;

@@ -15,8 +15,9 @@ and the project on GitHub.
   (The agent cannot edit settings.json; give the user the exact merged file to paste.)
 
 ## B. Secrets for the cloud environment (user does this; agent never sees values)
-On the Mac: `base64 -i ~/.seo-agent/gsc-key.json | pbcopy` (copies the JSON as one base64 line).
-Environment variables for the task's environment:
+Encode the Google key as one line (run in the project folder):
+`base64 -i .seo-agent/secrets/gsc-key.json | pbcopy`   (or the path where the key file lives)
+Environment variables for the cloud environment (used by both tasks):
 ```
 GOOGLE_SERVICE_ACCOUNT_JSON=<paste base64>
 PSI_API_KEY=...
@@ -27,17 +28,24 @@ SEO_AGENT_MODE=readonly
 `SEO_AGENT_MODE=readonly` makes the guard block every change outside `seo-reports/` and `.seo-agent/state/`.
 Least privilege: the service account only has Search Console access; keys are limited to these APIs.
 
-## C. Create the task
-claude.ai/code/routines → New → 
-- Repository: the project repo
-- Schedule: Weekly (e.g. Monday 09:00 Asia/Dhaka)
-- Network access: allow at least `<site domain>`, `www.googleapis.com`, `oauth2.googleapis.com`, `searchconsole.googleapis.com`,
-  `ssl.bing.com`, `api.indexnow.org` (or full internet access if custom lists are not offered)
-- Environment variables: section B
-- Prompt: `/seo-agent:weekly`
+## C. Schedule = intervals (project) + clock times (two cloud tasks)
+- **Intervals** (how many days between jobs) live in `.seo-agent/config.json` → `"schedule": {"index":3,"audit":7,"speed":15,"growth":30}`
+  and `"timezone"`. Change with `/seo-agent:schedule <job> <days>` then commit + push.
+- **Clock times** are the two cloud tasks (claude.ai/code/routines → New), both on the project repo, same environment (section B),
+  network access allowing at least `<site domain>`, `www.googleapis.com`, `oauth2.googleapis.com`, `searchconsole.googleapis.com`,
+  `ssl.bing.com`, `api.indexnow.org` (or full internet access if custom lists are not offered):
+  1. **"SEO night check"** — Daily at the user's check time (e.g. 03:00 Asia/Dhaka) — prompt: `/seo-agent:run`
+     Runs only the jobs that are due; on other days it ends in about a minute without a branch.
+  2. **"SEO morning report"** — Daily at the user's report time (e.g. 08:00) — prompt: `/seo-agent:deliver`
+     Opens the pull request for any new report branch → GitHub notifies the user.
+  Keep at least 2 hours between them. Cloud tasks can start a few minutes late.
+- Report branches are named `seo-report/<date>`. On Vercel/Netlify, skip builds for them (Vercel: Settings → Git → Ignored Build Step →
+  `if [[ "$VERCEL_GIT_COMMIT_REF" == seo-report/* || "$VERCEL_GIT_COMMIT_REF" == seo-weekly/* ]]; then exit 0; else exit 1; fi`).
+- If `git commit` / `git push` are in the project's `permissions.ask` list, unattended runs may stop there; if the test run gets
+  stuck at commit/push, the user should remove those two entries (the guard still blocks code changes in readonly mode).
 
 ## D. Test
-Click **Run now**. Check: the session started the plugin (session context shows "[seo-agent plugin is active]"), a report branch/PR
-appeared, and no code outside seo-reports/ changed. Ask the run (or a test run) to "read .env" → must be BLOCKED.
-If the plugin did not load in the cloud: tell the user; fallback is to paste the content of `/seo-agent:weekly` as the task prompt
-and add the tools to the repo — discuss before doing that.
+In each task click **Run now** (for the night check you can temporarily set the prompt to `/seo-agent:run --force all`, then
+change it back). Check: the session context shows "[seo-agent plugin is active]", a `seo-report/<date>` branch appears, the
+morning task opens a PR from it, and no code outside seo-reports/ changed. A "read .env" attempt must be BLOCKED.
+If the plugin does not load in the cloud: tell the user; discuss a fallback before doing anything else.

@@ -3,7 +3,7 @@
 A Claude Code plugin marketplace with one plugin: **seo-agent**.
 
 seo-agent audits SEO, performance and indexing; fixes code only with your approval; protects secret files with a hook;
-and can run every week in the cloud (Claude Code scheduled tasks) even when your computer is off.
+and can run on your own schedule in the cloud (e.g. checks at 03:00, report PR at 08:00; index every 3 days, audit every 7…) even when your computer is off.
 
 ## Install (Claude Code CLI or the VS Code extension)
 ```
@@ -28,7 +28,10 @@ installed per user, so the VS Code extension sees them too.
 | `/seo-agent:fix #3 #1` | fixes, one approved change at a time |
 | `/seo-agent:index` | after a deploy: sitemap resubmit, IndexNow ping, index check |
 | `/seo-agent:grow` | keyword opportunities and a 4-week growth plan |
-| `/seo-agent:weekly` | unattended weekly report (used by the cloud scheduled task) |
+| `/seo-agent:schedule` | show/change how often each check runs (index, audit, speed, growth) and how to change the clock times |
+| `/seo-agent:run` | night cloud task: runs only the due checks, saves the report to a `seo-report/<date>` branch |
+| `/seo-agent:deliver` | morning cloud task: opens the pull request for the new report (you get notified) |
+| `/seo-agent:weekly` | older name: run every check now |
 
 ## Security model
 - A PreToolUse hook (`plugins/seo-agent/scripts/guard.cjs`) blocks reading/searching/printing `.env*`, keys, credentials and
