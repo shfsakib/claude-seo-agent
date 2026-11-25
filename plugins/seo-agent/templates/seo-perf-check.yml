@@ -1,0 +1,105 @@
+# SEO perf check — runs after every successful PRODUCTION deploy (Vercel/Netlify GitHub deployments),
+# measures key pages (median of 3 PageSpeed runs), compares with the last good baseline,
+# and only if scores dropped asks Claude (cloud scheduled task, API trigger) to find and rank the causes.
+# Installed by /seo-agent:perfwatch. Needs repo secrets: PSI_API_KEY, and (optional) SEO_ROUTINE_URL + SEO_ROUTINE_TOKEN.
+name: SEO perf check
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      accept_baseline:
+        description: "Save this run as the new baseline even if scores dropped (use when a drop is intended)"
+        type: boolean
+        default: false
+      simulate_regression:
+        description: "TEST ONLY: pretend the first page got slower, to test the alert chain"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: seo-perf-check
+  cancel-in-progress: false
+
+env:
+  PLUGIN_REPO: __PLUGIN_REPO__          # e.g. your-user/claude-seo-agent
+  BASELINE_BRANCH: seo-perf/baseline
+
+jobs:
+  perf:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       (github.event.deployment.environment == 'Production' || github.event.deployment.environment == 'production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PLUGIN_REPO }}
+          path: .seo-agent-plugin
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Load last good baseline
+        run: |
+          echo '{}' > /tmp/baseline.json; : > /tmp/history.jsonl
+          if git fetch -q origin "$BASELINE_BRANCH:refs/remotes/origin/$BASELINE_BRANCH" 2>/dev/null; then
+            git show "origin/$BASELINE_BRANCH:perf-baseline.json" > /tmp/baseline.json 2>/dev/null || echo '{}' > /tmp/baseline.json
+            git show "origin/$BASELINE_BRANCH:history.jsonl" > /tmp/history.jsonl 2>/dev/null || true
+          fi
+
+      - name: Let the new deploy settle
+        if: github.event_name == 'deployment_status'
+        run: sleep 90
+
+      - name: Measure and compare
+        id: check
+        env:
+          PSI_API_KEY: ${{ secrets.PSI_API_KEY }}
+          DEPLOY_SHA: ${{ github.event.deployment.sha || github.sha }}
+        run: |
+          node .seo-agent-plugin/plugins/seo-agent/tools/perfcheck.mjs \
+            --baseline /tmp/baseline.json --out /tmp/perf-current.json --payload /tmp/perf-payload \
+            --sha "$DEPLOY_SHA" ${{ inputs.simulate_regression && '--simulate' || '' }}
+
+      - name: Save as new baseline (no regression, or accepted)
+        if: steps.check.outputs.regression != 'true' || inputs.accept_baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node -e 'const c=require("/tmp/perf-current.json");const l={sha:c.sha,date:c.date,pages:Object.fromEntries(Object.entries(c.pages).map(([u,p])=>[u,{perf:p.perf,seo:p.seo,lcpMs:p.lcpMs,cls:p.cls}]))};require("fs").appendFileSync("/tmp/history.jsonl",JSON.stringify(l)+"\n")'
+          dir=$(mktemp -d); cd "$dir"
+          git init -q && git checkout -q -b "$BASELINE_BRANCH"
+          cp /tmp/perf-current.json perf-baseline.json; cp /tmp/history.jsonl history.jsonl
+          git config user.name "seo-perf-bot"; git config user.email "seo-perf-bot@users.noreply.github.com"
+          git add . && git commit -qm "perf baseline ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$BASELINE_BRANCH"
+
+      - name: Ask Claude to investigate (only on regression)
+        if: steps.check.outputs.regression == 'true' && !inputs.accept_baseline
+        env:
+          SEO_ROUTINE_URL: ${{ secrets.SEO_ROUTINE_URL }}
+          SEO_ROUTINE_TOKEN: ${{ secrets.SEO_ROUTINE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$SEO_ROUTINE_URL" ] && [ -n "$SEO_ROUTINE_TOKEN" ]; then
+            node -e 'const fs=require("fs");process.stdout.write(JSON.stringify({text:fs.readFileSync("/tmp/perf-payload.json","utf8")}))' > /tmp/fire.json
+            code=$(curl -sS -o /tmp/fire-resp.json -w "%{http_code}" -X POST "$SEO_ROUTINE_URL" \
+              -H "Authorization: Bearer $SEO_ROUTINE_TOKEN" \
+              -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+              -H "anthropic-version: 2023-06-01" \
+              -H "Content-Type: application/json" --data @/tmp/fire.json)
+            echo "Claude task fired: HTTP $code"
+            if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then exit 0; fi
+          fi
+          # Fallback: no Claude task configured (or the call failed) -> open a plain issue with the numbers
+          gh issue create --title "⚠️ Performance dropped after deploy ${GITHUB_SHA::7}" --body-file /tmp/perf-payload.md

@@ -117,7 +117,12 @@ export function meta(html, key) {
 export function saveReport(name, data) {
   const dir = path.join(PROJECT, "seo-reports", "raw");
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `${today()}-${name}.json`);
+  let file = path.join(dir, `${today()}-${name}.json`);
+  if (fs.existsSync(file)) {
+    const hhmm = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()).replace(":", "");
+    file = path.join(dir, `${today()}-${name}-${hhmm}.json`);
+    for (let i = 2; fs.existsSync(file); i++) file = path.join(dir, `${today()}-${name}-${hhmm}-${i}.json`);
+  }
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
   console.log(`\nSaved: ${path.relative(PROJECT, file)}`);
   return file;

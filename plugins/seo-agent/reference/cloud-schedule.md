@@ -40,9 +40,10 @@ Least privilege: the service account only has Search Console access; keys are li
      Opens the pull request for any new report branch → GitHub notifies the user.
   Keep at least 2 hours between them. Cloud tasks can start a few minutes late.
 - Report branches are named `seo-report/<date>`. On Vercel/Netlify, skip builds for them (Vercel: Settings → Git → Ignored Build Step →
-  `if [[ "$VERCEL_GIT_COMMIT_REF" == seo-report/* || "$VERCEL_GIT_COMMIT_REF" == seo-weekly/* ]]; then exit 0; else exit 1; fi`).
-- If `git commit` / `git push` are in the project's `permissions.ask` list, unattended runs may stop there; if the test run gets
-  stuck at commit/push, the user should remove those two entries (the guard still blocks code changes in readonly mode).
+  `if [[ "$VERCEL_GIT_COMMIT_REF" == seo-* ]]; then exit 0; else exit 1; fi` (covers seo-report/*, seo-weekly/*, seo-perf/*)).
+- Cloud runs use auto mode, but anything matching an `ask` rule still stops and waits. Remove `Bash(git commit:*)` and
+  `Bash(git push:*)` from the project's `permissions.ask` BEFORE the first unattended run (the guard still blocks code changes
+  in readonly mode). Schedule a few minutes past the hour (e.g. 03:07, 08:07): runs exactly on the hour can start late.
 
 ## D. Test
 In each task click **Run now** (for the night check you can temporarily set the prompt to `/seo-agent:run --force all`, then

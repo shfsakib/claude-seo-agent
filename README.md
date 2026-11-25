@@ -32,6 +32,8 @@ installed per user, so the VS Code extension sees them too.
 | `/seo-agent:run` | night cloud task: runs only the due checks, saves the report to a `seo-report/<date>` branch |
 | `/seo-agent:deliver` | morning cloud task: opens the pull request for the new report (you get notified) |
 | `/seo-agent:weekly` | older name: run every check now |
+| `/seo-agent:perfwatch` | set up a speed check after every production deploy (GitHub Action; Claude investigates only if scores drop) |
+| `/seo-agent:regress` | used by that check: finds and ranks the causes of a drop and opens a GitHub issue |
 
 ## Security model
 - A PreToolUse hook (`plugins/seo-agent/scripts/guard.cjs`) blocks reading/searching/printing `.env*`, keys, credentials and

@@ -194,7 +194,10 @@ function main(input) {
     if (reader) {
       const scopes = candidates.filter((c) => c.isDir).map((c) => c.abs);
       const implicitCwd = /(^|[\s;|&(])(rg|ag|ack)\b|git\s+(grep|diff|log|show|archive|stash)\b|(^|[\s;|&(])e?grep\s+[^|;&]*-[a-zA-Z]*[rR]/.test(cmd);
-      if (implicitCwd && !candidates.some((c) => c.exists)) scopes.push(projectDir);
+      // git commands that only list names/stats (no file contents) are fine over the whole repo
+      const namesOnly = /git\s+(diff|log|show)\b/.test(cmd) && /--(name-only|name-status|stat|shortstat|numstat|oneline)\b/.test(cmd)
+        && !/(\s-p\b|--patch|\s-U\d|--unified|--word-diff)/.test(cmd) && !/(^|[\s;|&(])(cat|grep|rg|xargs)\b/.test(cmd);
+      if (implicitCwd && !namesOnly && !candidates.some((c) => c.exists)) scopes.push(projectDir);
       for (const sc of scopes) {
         const hit = protectedInside(sc);
         if (hit) block(`this command would read inside a folder that contains protected files (${hit}). Point it at specific files or a folder without protected files${/git\s+(diff|log|show)/.test(cmd) ? ", e.g. git diff -- src/app" : ""}.`);
