@@ -8,7 +8,7 @@ and can run on your own schedule in the cloud (e.g. checks at 03:00, report PR a
 ## Install (Claude Code CLI or the VS Code extension)
 ```
 /plugin marketplace add <your-github-username>/claude-seo-agent
-/plugin install seo-agent@sakib-seo-tools
+/plugin install seo-agent@shfsakib
 ```
 Restart Claude Code, open your website project, then run:
 ```
@@ -60,6 +60,6 @@ seo-reports/                      audits, weekly reports, history
 
 ## Updating
 Change files here, bump `version` in `plugins/seo-agent/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`,
-push, then in Claude Code: `/plugin marketplace update sakib-seo-tools`.
+push, then in Claude Code: `/plugin marketplace update shfsakib`.
 
 License: MIT
