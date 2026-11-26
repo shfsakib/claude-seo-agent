@@ -65,7 +65,7 @@ check time (default 03:00) and report time (default 08:00), at least 2 hours apa
 pre-flight, environment variables + base64 command, Vercel ignored build step if they use Vercel, create the two tasks
 ("SEO night check" → `/seo-agent:run`, "SEO morning report" → `/seo-agent:deliver`), Run-now test of both.
 
-## Phase F — Optional: check after every deploy
-Offer `/seo-agent:perfwatch` (GitHub Action measures key pages after each production deploy; Claude investigates only when scores drop).
+## Phase F — Optional: automatic checks
+Offer `/seo-agent:watch` (local check on every git push or every N days, no live requests) and/or `/seo-agent:perfwatch` (GitHub Action measures key pages after each production deploy; Claude investigates only when scores drop).
 
-At the end, print a final checklist (all ✅ / what's left) and how to use: check (local), check-url, audit, fix, index, grow, schedule, run, deliver, perfwatch.
+At the end, print a final checklist (all ✅ / what's left) and how to use: check (local), watch (on push), check-url, audit, fix, index, grow, schedule, run, deliver, perfwatch.

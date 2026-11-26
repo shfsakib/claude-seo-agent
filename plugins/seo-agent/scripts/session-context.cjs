@@ -6,12 +6,14 @@ try {
   const root = path.resolve(process.env.CLAUDE_PLUGIN_ROOT || path.join(__dirname, ".."));
   const project = path.resolve(process.env.CLAUDE_PROJECT_DIR || process.cwd());
   const configured = fs.existsSync(path.join(project, ".seo-agent", "config.json"));
+  // keep the git push hook pointed at the current plugin version
+  if (configured) { try { fs.mkdirSync(path.join(project, ".seo-agent", "state"), { recursive: true }); fs.writeFileSync(path.join(project, ".seo-agent", "state", "plugin-path"), path.join(root, "tools")); } catch {} }
   const tools = path.join(root, "tools");
   const lines = [
     "[seo-agent plugin is active]",
     `Manual (read before any SEO work): ${path.join(root, "reference", "manual.md")}`,
     `Reference docs folder: ${path.join(root, "reference")}`,
-    `Run tools from the project root with: node "${tools}/<tool>.mjs" <args>   (tools: onpage, speed, gsc, bing, schedule, perfcheck, localcheck)`,
+    `Run tools from the project root with: node "${tools}/<tool>.mjs" <args>   (tools: onpage, speed, gsc, bing, schedule, perfcheck, localcheck, watch)`,
     "Security: protected files are enforced by a hook. Never try to bypass a BLOCKED message.",
     configured
       ? "This project is configured (.seo-agent/config.json). Project notes: .seo-agent/project-notes.md"

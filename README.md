@@ -7,7 +7,7 @@ and can run on your own schedule in the cloud (e.g. checks at 03:00, report PR a
 
 ## Install (Claude Code CLI or the VS Code extension)
 ```
-/plugin marketplace add <your-github-username>/claude-seo-agent
+/plugin marketplace add shfsakib/claude-seo-agent
 /plugin install seo-agent@shfsakib
 ```
 Restart Claude Code, open your website project, then run:
@@ -25,6 +25,7 @@ installed per user, so the VS Code extension sees them too.
 |---|---|
 | `/seo-agent:setup` | setup wizard (run again any time to continue or see status) |
 | `/seo-agent:check` | **local check**: build + run the site on your computer, Lighthouse + SEO crawl, compare with last time, explain drops (no live-site requests) |
+| `/seo-agent:watch` | automatic check on **every git push** or **every N days** (`/seo-agent:watch every-push`, `/seo-agent:watch 7`, `/seo-agent:watch off`): builds the pushed commit locally, Lighthouse + SEO crawl, compares with last time, Claude explains any drop, notification when done |
 | `/seo-agent:check-url <url>` | check any page by URL (yours or a competitor's): PageSpeed scores, Core Web Vitals, on-page SEO |
 | `/seo-agent:audit` | full audit → `seo-reports/<date>-audit.md` |
 | `/seo-agent:fix #3 #1` | fixes, one approved change at a time |

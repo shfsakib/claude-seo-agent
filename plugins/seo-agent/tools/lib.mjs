@@ -10,7 +10,7 @@ export function flag(name, def) {
   return v && !v.startsWith("--") ? v : true;
 }
 // URLs given on the command line (values of flags like --site <url> are not page URLs)
-const VALUE_FLAGS = new Set(["site", "sitemap", "runs", "baseline", "out", "payload", "sha", "port", "project", "force"]);
+const VALUE_FLAGS = new Set(["site", "sitemap", "runs", "baseline", "out", "payload", "sha", "port", "project", "force", "build-dir", "result"]);
 export const urlArgs = () => {
   const out = [];
   for (let i = 0; i < args.length; i++) {
