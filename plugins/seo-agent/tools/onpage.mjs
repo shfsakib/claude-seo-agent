@@ -1,6 +1,9 @@
 // Technical + on-page SEO crawl of sitemap URLs.
 // node onpage.mjs [url ...] [--sitemap 50]
-import { config, SITE, get, targetUrls, pool, saveReport, tags, blocks, stripTags, meta } from "./lib.mjs";
+import { config, SITE, LOCAL_MODE, mapUrl, flag, get, targetUrls, pool, saveReport, tags, blocks, stripTags, meta } from "./lib.mjs";
+
+// --page-only: check just the given URL(s) (any site), skip site-wide checks and the broken-link scan.
+const PAGE_ONLY = !!flag("page-only", false);
 
 const issues = [];
 const add = (severity, url, message, fix) => issues.push({ severity, url, message, fix });
@@ -31,6 +34,7 @@ async function siteChecks() {
     const { res } = await get(`${SITE}/llms.txt`, { method: "HEAD" });
     if (!res.ok) add("low", `${SITE}/llms.txt`, "no llms.txt (optional AI-agent summary file)");
   } catch {}
+  if (LOCAL_MODE) return;   // http->https and www checks only make sense on the live domain
   const u = new URL(SITE);
   const alt = u.host.startsWith("www.") ? u.host.slice(4) : "www." + u.host;
   for (const v of [`http://${u.host}/`, `${u.protocol}//${alt}/`]) {
@@ -71,7 +75,7 @@ async function checkPage(url) {
   if (/noindex/i.test(robots)) add("critical", url, "page is noindex but listed in the sitemap");
   const canonical = (tags(head, "link").find((a) => (a.rel || "").toLowerCase() === "canonical") || {}).href;
   if (!canonical) add("medium", url, "missing canonical");
-  else if (norm(new URL(canonical, finalUrl).href) !== norm(finalUrl)) add("medium", url, `canonical points elsewhere: ${canonical}`);
+  else if (norm(mapUrl(new URL(canonical, finalUrl).href)) !== norm(finalUrl)) add("medium", url, `canonical points elsewhere: ${canonical}`);
   const htmlTag = tags(html, "html")[0] || {};
   if (!htmlTag.lang) add("low", url, "<html> has no lang attribute");
   if (meta(head, "viewport") === undefined) add("high", url, "missing viewport meta");
@@ -100,7 +104,7 @@ async function checkPage(url) {
   for (const a of tags(clean, "a")) {
     if (!a.href || /^(mailto:|tel:|javascript:|#)/i.test(a.href)) continue;
     try {
-      const abs = new URL(a.href, finalUrl); abs.hash = "";
+      const abs = new URL(mapUrl(new URL(a.href, finalUrl).href)); abs.hash = "";
       if (abs.host !== host) continue;
       if (!linkSources.has(abs.href)) linkSources.set(abs.href, url);
       if (/nofollow/i.test(a.rel || "")) add("low", url, `internal link with nofollow: ${abs.pathname}`);
@@ -109,9 +113,9 @@ async function checkPage(url) {
   pages.push(p);
 }
 
-await siteChecks();
+if (!PAGE_ONLY) await siteChecks();
 const urls = await targetUrls(config.maxPages || 50);
-console.log(`Checking ${urls.length} page(s) of ${SITE} ...`);
+console.log(PAGE_ONLY ? `Checking ${urls.length} page(s) ...` : `Checking ${urls.length} page(s) of ${SITE} ...`);
 await pool(urls, 5, checkPage);
 
 for (const key of ["title", "description"]) {
@@ -120,7 +124,7 @@ for (const key of ["title", "description"]) {
   for (const [v, list] of m) if (list.length > 1) add("medium", list.join(", "), `duplicate ${key} on ${list.length} pages: "${v.slice(0, 70)}"`);
 }
 const checked = new Set(pages.map((p) => norm(p.url)));
-const toCheck = [...linkSources.keys()].filter((l) => !checked.has(norm(l))).slice(0, config.maxLinkChecks || 150);
+const toCheck = PAGE_ONLY ? [] : [...linkSources.keys()].filter((l) => !checked.has(norm(l))).slice(0, config.maxLinkChecks || 150);
 await pool(toCheck, 8, async (l) => {
   try {
     let { res } = await get(l, { method: "HEAD" });
@@ -135,4 +139,4 @@ const counts = issues.reduce((m, i) => ((m[i.severity] = (m[i.severity] || 0) + 
 console.log("Issue count:", counts);
 for (const i of issues.slice(0, 25)) console.log(` [${i.severity.toUpperCase()}] ${i.message}  <- ${i.url}`);
 if (issues.length > 25) console.log(` ...${issues.length - 25} more in the JSON report`);
-saveReport("onpage", { generatedAt: new Date().toISOString(), site: SITE, sitemapUrls: urls, counts, pages, issues });
+saveReport(LOCAL_MODE ? "local-onpage" : PAGE_ONLY ? "url-onpage" : "onpage", { generatedAt: new Date().toISOString(), site: SITE, sitemapUrls: urls, counts, pages, issues });

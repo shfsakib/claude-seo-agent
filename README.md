@@ -24,6 +24,8 @@ installed per user, so the VS Code extension sees them too.
 | Command | What it does |
 |---|---|
 | `/seo-agent:setup` | setup wizard (run again any time to continue or see status) |
+| `/seo-agent:check` | **local check**: build + run the site on your computer, Lighthouse + SEO crawl, compare with last time, explain drops (no live-site requests) |
+| `/seo-agent:check-url <url>` | check any page by URL (yours or a competitor's): PageSpeed scores, Core Web Vitals, on-page SEO |
 | `/seo-agent:audit` | full audit → `seo-reports/<date>-audit.md` |
 | `/seo-agent:fix #3 #1` | fixes, one approved change at a time |
 | `/seo-agent:index` | after a deploy: sitemap resubmit, IndexNow ping, index check |

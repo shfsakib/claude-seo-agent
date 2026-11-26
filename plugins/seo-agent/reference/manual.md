@@ -43,7 +43,10 @@ and report. Never commit or push unless asked. Never touch checkout/cart/payment
 | `node <tools>/bing.mjs quota` / `queries` / `submit` | Bing API check, query data, URL submission |
 | `node <tools>/bing.mjs indexnow [url...]` | instant ping (Bing, Yandex, Naver, Seznam…) for new/changed URLs |
 | `node <tools>/schedule.mjs status` / `due [--force x]` / `mark <job>` | monitoring schedule: which jobs are due, record finished jobs |
-| `node <tools>/perfcheck.mjs [urls] [--runs 3]` | median-of-N PageSpeed scores for key pages (config `speedUrls`); used after deploys to detect regressions |
+| `node <tools>/perfcheck.mjs [urls] [--runs 3] [--local]` | median-of-N scores for key pages (config `speedUrls`), PageSpeed or local Lighthouse; compares with a baseline |
+| `node <tools>/localcheck.mjs [--quick] [--no-build] [--accept]` | build + start the site on localhost, Lighthouse + crawl the LOCAL build, compare with the last local run (no live requests) |
+| any tool + `--site http://127.0.0.1:3100` | run against a local build: production URLs from sitemap/canonicals are mapped to that origin |
+| `node <tools>/onpage.mjs <url> --page-only` | SEO checks for one page of any site |
 Raw JSON goes to `seo-reports/raw/`. Exit code 3 = a key is missing: say which, point to the setup doc, continue with the rest.
 
 ## 3. What to check in code
@@ -62,6 +65,7 @@ Framework specifics: see `nextjs.md` in the reference folder when the project us
 Audit (`/seo-agent:audit`) → Fix with approval (`/seo-agent:fix`) → Index after deploy (`/seo-agent:index`)
 → Grow from search data (`/seo-agent:grow`) → Scheduled monitoring: night `/seo-agent:run` (only due jobs) + morning
 `/seo-agent:deliver` (opens the PR), both cloud tasks; intervals via `/seo-agent:schedule`. Dates use config `timezone`.
+On demand: `/seo-agent:check` (local build, no live requests) and `/seo-agent:check-url <url>` (any page).
 After every production deploy (optional, `/seo-agent:perfwatch`): a GitHub Action measures key pages and, only if scores drop,
 starts `/seo-agent:regress`, which ranks the causes in a GitHub issue.
 Name-only git commands (`git diff --name-status`, `git log --oneline`) are allowed repo-wide; read diffs file by file.

@@ -43,7 +43,9 @@ B1. Ask for the live domain. Fetch the homepage, `/robots.txt`, the sitemap (fro
 B2. Create `.seo-agent/config.json` (approval):
     `{ "siteUrl", "sitemapUrl", "gscProperty", "framework", "replyLanguage", "timezone": "<user's IANA zone, e.g. Asia/Dhaka>",
        "maxPages": <≥ sitemap URL count>, "speedPages": 5, "maxLinkChecks": 150, "strikingMinImpressions": 20,
-       "schedule": { "index": 3, "audit": 7, "speed": 15, "growth": 30 } }`  (ask the user if they want other intervals)
+       "schedule": { "index": 3, "audit": 7, "speed": 15, "growth": 30 },
+       "speedUrls": [5 key page URLs], "local": { "build": "npm run build", "start": "npx next start -p {port}", "port": 3100 } }`
+    (ask the user if they want other intervals; adapt build/start commands to the stack)
 B3. Create `.seo-agent/project-notes.md` (approval) with what you learned: framework, key folders, data flow for pages,
     validation commands, things never to touch (checkout, payments…), deploy method if the user knows it.
 B4. Run `onpage.mjs --sitemap 10` as a smoke test and show a 3-line result.
@@ -66,4 +68,4 @@ pre-flight, environment variables + base64 command, Vercel ignored build step if
 ## Phase F — Optional: check after every deploy
 Offer `/seo-agent:perfwatch` (GitHub Action measures key pages after each production deploy; Claude investigates only when scores drop).
 
-At the end, print a final checklist (all ✅ / what's left) and how to use: audit, fix, index, grow, schedule, run, deliver, perfwatch.
+At the end, print a final checklist (all ✅ / what's left) and how to use: check (local), check-url, audit, fix, index, grow, schedule, run, deliver, perfwatch.

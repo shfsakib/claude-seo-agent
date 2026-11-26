@@ -1,4 +1,5 @@
 // PageSpeed Insights helpers shared by speed.mjs and perfcheck.mjs (no dependencies).
+import { spawnSync } from "node:child_process";
 import { redact } from "./lib.mjs";
 
 export const METRICS = ["first-contentful-paint", "largest-contentful-paint", "total-blocking-time", "cumulative-layout-shift", "speed-index"];
@@ -43,4 +44,14 @@ export async function psi(url, strategy = "mobile") {
     if (attempt === 3 || res.status === 400) throw new Error(redact(msg) + (key ? "" : " (tip: set PSI_API_KEY for a higher quota)"));
     await new Promise((r) => setTimeout(r, 5000 * attempt));
   }
+}
+
+// Lighthouse on this computer (needs Google Chrome installed; first run downloads lighthouse via npx).
+export function lighthouseLocal(url, strategy = "mobile") {
+  const a = ["-y", "lighthouse@12", url, "--output=json", "--output-path=stdout", "--quiet",
+    "--only-categories=performance,accessibility,best-practices,seo", "--chrome-flags=--headless=new --no-sandbox"];
+  if (strategy === "desktop") a.push("--preset=desktop");
+  const r = spawnSync("npx", a, { encoding: "utf8", maxBuffer: 200 * 1024 * 1024 });
+  if (r.status !== 0) throw new Error((r.stderr || "lighthouse failed (is Google Chrome installed?)").split("\n").filter(Boolean).slice(-3).join(" "));
+  return summarize(JSON.parse(r.stdout), strategy);
 }

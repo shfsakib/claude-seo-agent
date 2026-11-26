@@ -9,7 +9,17 @@ export function flag(name, def) {
   const v = args[i + 1];
   return v && !v.startsWith("--") ? v : true;
 }
-export const urlArgs = () => args.filter((a) => /^https?:\/\//.test(a));
+// URLs given on the command line (values of flags like --site <url> are not page URLs)
+const VALUE_FLAGS = new Set(["site", "sitemap", "runs", "baseline", "out", "payload", "sha", "port", "project", "force"]);
+export const urlArgs = () => {
+  const out = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith("--")) { if (VALUE_FLAGS.has(a.slice(2))) i++; continue; }
+    if (/^https?:\/\//.test(a)) out.push(a);
+  }
+  return out;
+};
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const UA = "Mozilla/5.0 (compatible; seo-agent/1.0; +https://github.com)";
 
@@ -29,7 +39,21 @@ if (!PROJECT) {
   process.exit(1);
 }
 export const config = JSON.parse(fs.readFileSync(path.join(PROJECT, ".seo-agent", "config.json"), "utf8"));
-export const SITE = String(config.siteUrl || "").replace(/\/$/, "");
+export const PROD = String(config.siteUrl || "").replace(/\/$/, "");
+// --site <origin> runs the tools against another origin (e.g. a local build at http://127.0.0.1:3100).
+// Production URLs found in sitemaps, canonicals and links are mapped to that origin.
+const OVERRIDE = flag("site", null);
+export const LOCAL_MODE = !!OVERRIDE;
+export const SITE = OVERRIDE ? String(OVERRIDE).replace(/\/$/, "") : PROD;
+export function mapUrl(u) {
+  if (!OVERRIDE) return u;
+  try {
+    const x = new URL(u); const p = new URL(PROD);
+    const bare = (h) => h.replace(/^www\./, "");
+    if (bare(x.host) === bare(p.host)) return SITE + x.pathname + x.search;
+  } catch {}
+  return u;
+}
 export const TZ = config.timezone || "Asia/Dhaka";
 // today's date (YYYY-MM-DD) in the project's timezone, not UTC
 export function today(d = new Date()) {
@@ -71,7 +95,7 @@ export async function pool(items, n, fn) {
 
 // ---- sitemap
 export async function getSitemapUrls(max = config.maxPages || 50) {
-  const queue = [config.sitemapUrl || `${SITE}/sitemap.xml`];
+  const queue = [mapUrl(config.sitemapUrl || `${PROD}/sitemap.xml`)];
   const seen = new Set();
   const urls = [];
   while (queue.length && urls.length < max) {
@@ -81,7 +105,7 @@ export async function getSitemapUrls(max = config.maxPages || 50) {
     try {
       const { res, text } = await get(sm);
       if (!res.ok) { console.warn(`! sitemap ${sm} -> HTTP ${res.status}`); continue; }
-      const locs = [...text.matchAll(/<loc>\s*(?:<!\[CDATA\[)?\s*([^<\s\]]+)\s*(?:\]\]>)?\s*<\/loc>/g)].map((m) => decode(m[1]));
+      const locs = [...text.matchAll(/<loc>\s*(?:<!\[CDATA\[)?\s*([^<\s\]]+)\s*(?:\]\]>)?\s*<\/loc>/g)].map((m) => mapUrl(decode(m[1])));
       if (/<sitemapindex/i.test(text)) queue.push(...locs);
       else for (const l of locs) if (urls.length < max) urls.push(l);
     } catch (e) { console.warn(`! sitemap fetch failed: ${sm} (${e.message})`); }
@@ -89,7 +113,7 @@ export async function getSitemapUrls(max = config.maxPages || 50) {
   return urls;
 }
 export async function targetUrls(defaultCount) {
-  const u = urlArgs();
+  const u = urlArgs().map(mapUrl);
   if (u.length) return u;
   const n = Number(flag("sitemap", defaultCount));
   const list = (await getSitemapUrls(Math.max(n, 1))).slice(0, n);
